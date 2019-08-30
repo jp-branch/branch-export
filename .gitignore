@@ -126,3 +126,7 @@ dmypy.json
 # ignore folders
 input
 output
+
+
+# PyCharm
+.idea/
