@@ -85,9 +85,14 @@ def get_db_data(selected_columns, app_id, y, m, d):
     :return: (Dataframe obj) the result of the query
     """
     # TODO edit string based on what query to run
-    query_string = "select {} from hive.dfs_prod.eo_custom_event where app_id={} and y={} and m={} and d={}".format(
+    query_string1 = "select {} from hive.dfs_prod.eo_custom_event where app_id={} and y={} and m={} and d={} and h in (0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14)".format(
         ', '.join(selected_columns), app_id, y, m, d)
-    return pd.read_sql(query_string, con=dfs)
+    query_string2 = "select {} from hive.dfs_prod.eo_custom_event where app_id={} and y={} and m={} and d={} and h in (15, 16, 17, 18, 19, 20, 21, 22, 23)".format(
+        ', '.join(selected_columns), app_id, y, m, d-1)
+    result1 = pd.read_sql(query_string1, con=dfs)
+    result2 = pd.read_sql(query_string2, con=dfs)
+
+    return result1.append(result2, ignore_index=True)
 
 
 def escape_single_quotes(custom_data):
@@ -102,7 +107,10 @@ def escape_single_quotes(custom_data):
         z = re.sub(r"(?<!u)'(?!:|}|,)", '\\\'', custom_data.get('title_name', None))
 
         custom_data['title_name'] = z
-        return custom_data
+    if re.search("\'", custom_data.get('purchase_list', '')):
+        z=re.sub(r"\'", '\\\'', custom_data.get('purchase_list', None))
+        custom_data['purchase_list'] = z
+
     return custom_data
 
 
@@ -199,8 +207,11 @@ if __name__ == '__main__':
             'first_event_for_user', 'user_data_aaid', 'user_data_idfa', 'user_data_idfv', 'custom_data',
             'last_attributed_touch_type', 'last_attributed_touch_data_custom_fields']
     # get data from DB
-    dataframe = get_db_data(cols, settings_obj.app_id, 2019, 8, 3)
+    dataframe = get_db_data(cols, settings_obj.app_id, 2019, 8, 26)
+    print("data-export-get-data-from-db-complete!")
     # convert to CSV
     dataframe_to_csv(settings_obj, dataframe)
+    print("data-export-convert-csv-complete!")
     # parse csv and write to file
     parse_csv(settings_obj)
+    print("data-export-complete!")
