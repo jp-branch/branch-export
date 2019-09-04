@@ -33,13 +33,14 @@ class Settings:
     """
 
     def __init__(self, input_file=None, output_file=None, default_timezone='UTC', output_timezone=None,
-                 custom_column_headers=[], app_id=None):
+                 custom_column_headers=[], app_id=None, target_date=None):
         self.input_file_path = input_file
         self.output_file_path = output_file
         self.default_timezone = default_timezone
         self.output_timezone = output_timezone
         self.custom_column_headers = custom_column_headers
         self.app_id = app_id
+        self.target_date = "19700101" if target_date is None else target_date
 
 
 def import_settings(path_to_settings=None):
@@ -57,7 +58,7 @@ def import_settings(path_to_settings=None):
 
     with open(file_path) as in_file:
         data = json.load(in_file)
-        settings =   Settings()
+        settings = Settings()
 
         # required attributes, fail if missing
         try:
@@ -67,6 +68,28 @@ def import_settings(path_to_settings=None):
             settings.output_timezone = data['output_timezone']
             settings.custom_column_headers = data.get('custom_column_headers', [])
             settings.app_id = data['app_id']
+
+            # target_date
+            # TODO: automatically get local timezone
+            tz = "Asia/Seoul" if settings.output_timezone is None else settings.output_timezone
+
+            if len(sys.argv) >= 2 and sys.argv[1] is not None:
+                # script parameter
+                yyyymmdd = sys.argv[1]
+            elif data.get('target_date') is not None and bool(data.get('target_date')):
+                # configuration file
+                yyyymmdd = data['target_date']
+            else:
+                # raise IOError(errno.EINVAL, os.strerror(errno.EINVAL), "sys.argv[1]")
+                # fallback
+                yyyymmdd = datetime.datetime.now().strftime("%Y-%m-%d")
+
+            try:
+                settings.target_date = datetime.datetime.strptime(yyyymmdd, "%Y-%m-%d")
+            except Exception as e:
+                print("Invalid sys.argv[1] : {}".format(yyyymmdd))
+                settings.target_date = datetime.datetime.now()
+
         except KeyError as e:
             print("Key not found in {}: ".format(file_path) + str(e))
             sys.exit(1)
@@ -206,8 +229,12 @@ if __name__ == '__main__':
             'last_attributed_touch_data_tilde_ad_name', 'days_from_last_attributed_touch_to_event', 'user_data_os',
             'first_event_for_user', 'user_data_aaid', 'user_data_idfa', 'user_data_idfv', 'custom_data',
             'last_attributed_touch_type', 'last_attributed_touch_data_custom_fields']
+
+    # target date
+    t = settings_obj.target_date
+
     # get data from DB
-    dataframe = get_db_data(cols, settings_obj.app_id, 2019, 8, 26)
+    dataframe = get_db_data(cols, settings_obj.app_id, t.year, t.month, t.day)
     print("data-export-get-data-from-db-complete!")
     # convert to CSV
     dataframe_to_csv(settings_obj, dataframe)
